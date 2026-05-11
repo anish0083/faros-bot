@@ -1,0 +1,16 @@
+{
+  "name": "pharos-nft-bot",
+  "version": "1.0.0",
+  "description": "Discord bot that grants roles based on LitVM LiteForge testnet NFT ownership",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1",
+    "pg": "^8.20.0"
+  }
+}
