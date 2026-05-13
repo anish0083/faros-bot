@@ -1,11 +1,23 @@
 const { Pool } = require('pg');
+const dns = require('dns').promises;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
-});
+let pool;
+
+async function createPool() {
+  const dbUrl = new URL(process.env.DATABASE_URL);
+  const { address } = await dns.lookup(dbUrl.hostname, { family: 4 });
+  pool = new Pool({
+    host: address,
+    port: parseInt(dbUrl.port) || 5432,
+    database: dbUrl.pathname.slice(1),
+    user: dbUrl.username,
+    password: decodeURIComponent(dbUrl.password),
+    ssl: { rejectUnauthorized: false },
+  });
+}
 
 async function initializeDatabase() {
+  await createPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS server_configs (
       guild_id             TEXT PRIMARY KEY,
