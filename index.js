@@ -10,7 +10,9 @@ const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end('Bot is alive!');
 });
-server.listen(process.env.PORT || 3000);
+server.listen(process.env.PORT || 3000, '0.0.0.0', () => {
+  console.log(`[Server] Keep-alive server running on port ${process.env.PORT || 3000}`);
+});
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
