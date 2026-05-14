@@ -4,7 +4,7 @@ module.exports = async function handleConfigButton(interaction) {
   // showModal() must be the FIRST response — no async DB calls before this
   const modal = new ModalBuilder()
     .setCustomId('server_config_modal')
-    .setTitle('Pharos Bot — Server Config');
+    .setTitle('Faros Bot — Server Config');
 
   const contractInput = new TextInputBuilder()
     .setCustomId('config_contract')

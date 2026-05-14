@@ -1,4 +1,4 @@
-# fly.toml - Pharos NFT Bot
+# fly.toml - Faros NFT Bot
 app = 'faros-bot'
 primary_region = 'sin'
 
