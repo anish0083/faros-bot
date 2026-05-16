@@ -1,6 +1,6 @@
 const { MessageFlags } = require('discord.js');
 const { checkNFTOwnership } = require('../utils/blockchain');
-const { isTokenUsed, markTokenUsed, hasUserClaimed, getServerConfig } = require('../utils/database');
+const { hasUserClaimed, markTokenUsed, getServerConfig } = require('../utils/database');
 
 module.exports = async function handleClaimModal(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -37,37 +37,20 @@ module.exports = async function handleClaimModal(interaction) {
     return;
   }
 
-  let tokenIds;
+  let holdsNFT;
   try {
-    tokenIds = await checkNFTOwnership(ethAddress, contractAddress, rpcUrl);
+    holdsNFT = await checkNFTOwnership(ethAddress, contractAddress, rpcUrl);
   } catch (error) {
     console.error('[Claim] Blockchain error:', error);
     await interaction.editReply({ content: '❌ Could not connect to the blockchain. Please try again in a moment.' });
     return;
   }
 
-  if (tokenIds.length === 0) {
+  if (!holdsNFT) {
     await interaction.editReply({
       content:
         `❌ Wallet \`${ethAddress}\` does not hold any NFTs from the verified collection.\n\n` +
         'Make sure you entered the correct wallet address.',
-    });
-    return;
-  }
-
-  let eligibleTokenId = null;
-  for (const tokenId of tokenIds) {
-    if (!(await isTokenUsed(guildId, tokenId.toString()))) {
-      eligibleTokenId = tokenId;
-      break;
-    }
-  }
-
-  if (eligibleTokenId === null) {
-    await interaction.editReply({
-      content:
-        `❌ Your wallet holds **${tokenIds.length}** NFT(s), but all have already been used to claim a role.\n` +
-        'Each token ID can only be used once per server.',
     });
     return;
   }
@@ -82,15 +65,14 @@ module.exports = async function handleClaimModal(interaction) {
     return;
   }
 
-  await markTokenUsed(guildId, eligibleTokenId.toString(), member.id, ethAddress);
+  await markTokenUsed(guildId, '0', member.id, ethAddress);
 
   await interaction.editReply({
     content:
       `✅ You have been granted the <@&${roleId}> role!\n\n` +
-      `**Verified wallet:** \`${ethAddress}\`\n` +
-      `**Token ID:** \`${eligibleTokenId.toString()}\`\n\n` +
+      `**Verified wallet:** \`${ethAddress}\`\n\n` +
       'Welcome!',
   });
 
-  console.log(`[Claim] SUCCESS | Guild: ${guildId} | User: ${member.id} | Wallet: ${ethAddress} | Token: #${eligibleTokenId}`);
+  console.log(`[Claim] SUCCESS | Guild: ${guildId} | User: ${member.id} | Wallet: ${ethAddress}`);
 };
