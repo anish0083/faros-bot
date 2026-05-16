@@ -83,24 +83,10 @@ async function hasUserClaimed(guildId, discordUserId) {
 }
 
 async function markTokenUsed(guildId, tokenId, discordUserId, ethAddress) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query(
-      'INSERT INTO used_tokens (guild_id, token_id, discord_user_id, eth_address) VALUES ($1, $2, $3, $4)',
-      [guildId, tokenId, discordUserId, ethAddress]
-    );
-    await client.query(
-      'INSERT INTO claimed_users (guild_id, discord_user_id, eth_address, token_id) VALUES ($1, $2, $3, $4)',
-      [guildId, discordUserId, ethAddress, tokenId]
-    );
-    await client.query('COMMIT');
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
-  } finally {
-    client.release();
-  }
+  await pool.query(
+    'INSERT INTO claimed_users (guild_id, discord_user_id, eth_address, token_id) VALUES ($1, $2, $3, $4)',
+    [guildId, discordUserId, ethAddress, tokenId]
+  );
 }
 
 module.exports = { initializeDatabase, getServerConfig, setServerConfig, isTokenUsed, hasUserClaimed, markTokenUsed };
