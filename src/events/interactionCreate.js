@@ -1,6 +1,8 @@
 const { MessageFlags } = require('discord.js');
 const handleClaimButton = require('../handlers/claimButton');
 const handleClaimModal  = require('../handlers/claimModal');
+const handleRoleSelect  = require('../handlers/roleSelect');
+const { ROLE_SELECT_ID } = require('../utils/roleSetup');
 
 module.exports = {
   name: 'interactionCreate',
@@ -15,6 +17,11 @@ module.exports = {
           return;
         }
         await command.execute(interaction);
+        return;
+      }
+
+      if (interaction.isRoleSelectMenu()) {
+        if (interaction.customId === ROLE_SELECT_ID) await handleRoleSelect(interaction);
         return;
       }
 

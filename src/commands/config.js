@@ -4,8 +4,9 @@ const {
   PermissionFlagsBits,
   MessageFlags,
 } = require('discord.js');
-const { getGuildRole, setGuildRole } = require('../utils/database');
+const { getGuildRole } = require('../utils/database');
 const { CHAIN, NFT, explorerAddressLink, chainFooter } = require('../config/chain');
+const { buildRoleSelect, applyRole } = require('../utils/roleSetup');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -15,7 +16,7 @@ module.exports = {
     .addRoleOption(option =>
       option
         .setName('role')
-        .setDescription('Role to grant verified NFT holders (leave empty to view current config)')
+        .setDescription('Role to grant verified NFT holders (leave empty to pick from a menu)')
         .setRequired(false)
     )
     .addStringOption(option =>
@@ -51,44 +52,7 @@ module.exports = {
     }
 
     if (role) {
-      if (role.managed) {
-        await interaction.editReply({
-          content: `❌ <@&${role.id}> is managed by an integration and cannot be assigned manually. Create a normal role instead.`,
-        });
-        return;
-      }
-
-      if (role.id === interaction.guild.id) {
-        await interaction.editReply({ content: '❌ `@everyone` cannot be used as the holder role.' });
-        return;
-      }
-
-      const me = await interaction.guild.members.fetchMe();
-      if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        await interaction.editReply({ content: '❌ The bot is missing the **Manage Roles** permission. Grant it and try again.' });
-        return;
-      }
-      if (me.roles.highest.comparePositionTo(role) <= 0) {
-        await interaction.editReply({
-          content:
-            `❌ <@&${role.id}> is above or equal to the bot's highest role (<@&${me.roles.highest.id}>).\n` +
-            'Move the bot\'s role **above** it in Server Settings → Roles.',
-        });
-        return;
-      }
-
-      await setGuildRole(interaction.guildId, role.id);
-
-      await interaction.editReply({
-        content:
-          '✅ **Configuration saved!**\n\n' +
-          `**Role:** <@&${role.id}>\n` +
-          `**Chain:** ${CHAIN.name}\n` +
-          `**Collection:** ${NFT.name} — ${explorerAddressLink(NFT.address)}\n\n` +
-          'Now run `/setupnft` in the channel where you want the claim button.',
-      });
-
-      console.log(`[Config] Guild ${interaction.guildId} (${interaction.guild.name}) → role ${role.id} by ${interaction.user.tag}`);
+      await interaction.editReply({ content: await applyRole(interaction, role) });
       return;
     }
 
@@ -109,17 +73,17 @@ module.exports = {
         '✅ **This server is configured.**\n\n' +
         `**Role:** <@&${config.role_id}>\n` +
         `**Last configured:** ${new Date(config.configured_at).toUTCString()}\n\n` +
-        'To change the role, run `/config role:@YourRole`.'
+        'Pick a different role from the menu below to change it.'
       );
     } else {
       embed.setDescription(
         '❌ **This server is not configured yet.**\n\n' +
-        'Run `/config role:@YourRole` to set it up, or `/config role_id:123456789012345678` if you would rather paste the ID.\n\n' +
+        'Pick the holder role from the menu below.\n\n' +
         'The chain and NFT contract are already built into the bot — you only need to choose the role.\n' +
         'Make sure the bot has **Manage Roles** and that its role sits **above** the target role.'
       );
     }
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed], components: [buildRoleSelect()] });
   },
 };
