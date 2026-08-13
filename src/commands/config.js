@@ -17,12 +17,38 @@ module.exports = {
         .setName('role')
         .setDescription('Role to grant verified NFT holders (leave empty to view current config)')
         .setRequired(false)
+    )
+    .addStringOption(option =>
+      option
+        .setName('role_id')
+        .setDescription('Role ID, if you prefer pasting it instead of picking the role')
+        .setRequired(false)
+        .setMinLength(17)
+        .setMaxLength(20)
     ),
 
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const role = interaction.options.getRole('role');
+    const roleId = interaction.options.getString('role_id');
+    let role = interaction.options.getRole('role');
+
+    if (!role && roleId) {
+      if (!/^\d{17,20}$/.test(roleId.trim())) {
+        await interaction.editReply({
+          content:
+            '❌ **Invalid Role ID.** It must be 17–20 digits.\n' +
+            'Enable Discord Settings → Advanced → Developer Mode, then right-click the role → Copy Role ID.',
+        });
+        return;
+      }
+
+      role = await interaction.guild.roles.fetch(roleId.trim()).catch(() => null);
+      if (!role) {
+        await interaction.editReply({ content: `❌ **No role with ID \`${roleId.trim()}\`** exists in this server.` });
+        return;
+      }
+    }
 
     if (role) {
       if (role.managed) {
@@ -88,7 +114,7 @@ module.exports = {
     } else {
       embed.setDescription(
         '❌ **This server is not configured yet.**\n\n' +
-        'Run `/config role:@YourRole` to set it up.\n\n' +
+        'Run `/config role:@YourRole` to set it up, or `/config role_id:123456789012345678` if you would rather paste the ID.\n\n' +
         'The chain and NFT contract are already built into the bot — you only need to choose the role.\n' +
         'Make sure the bot has **Manage Roles** and that its role sits **above** the target role.'
       );
