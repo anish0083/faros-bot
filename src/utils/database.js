@@ -1,19 +1,43 @@
 const { Pool } = require('pg');
-const dns = require('dns').promises;
 
 let pool;
 
 async function createPool() {
-  const dbUrl = new URL(process.env.DATABASE_URL);
-  const { address } = await dns.lookup(dbUrl.hostname, { family: 4 });
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is not set');
+  }
+
   pool = new Pool({
-    host: address,
-    port: parseInt(dbUrl.port) || 5432,
-    database: dbUrl.pathname.slice(1),
-    user: dbUrl.username,
-    password: decodeURIComponent(dbUrl.password),
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000,
   });
+
+  pool.on('error', error => console.error('[Database] Idle client error:', error.message));
+
+  try {
+    const client = await pool.connect();
+    client.release();
+  } catch (error) {
+    const host = safeHost(process.env.DATABASE_URL);
+    if (/tenant.{0,3}(or )?user .*not found/i.test(error.message)) {
+      throw new Error(
+        `Postgres rejected the connection to ${host}: "${error.message}". ` +
+        'The project reference in the username does not match an active database. ' +
+        'Check that the Supabase project is not paused and that DATABASE_URL is the current pooler connection string.'
+      );
+    }
+    throw new Error(`Could not connect to Postgres at ${host}: ${error.message}`);
+  }
+}
+
+function safeHost(connectionString) {
+  try {
+    const url = new URL(connectionString);
+    return `${url.hostname}:${url.port || 5432}`;
+  } catch {
+    return 'the configured host';
+  }
 }
 
 async function initializeDatabase() {
