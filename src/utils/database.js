@@ -20,6 +20,14 @@ async function createPool() {
     client.release();
   } catch (error) {
     const host = safeHost(process.env.DATABASE_URL);
+    if (/ENETUNREACH/.test(error.message) && /:.*:/.test(error.message)) {
+      throw new Error(
+        `Could not reach ${host} over IPv6: ${error.message}. ` +
+        'Supabase direct connections are IPv6-only and most hosts, including Render, have no IPv6 route. ' +
+        'Use the Session pooler connection string from Supabase (Project Settings -> Database -> Connection string -> Session pooler), ' +
+        'whose host resolves over IPv4.'
+      );
+    }
     if (/tenant.{0,3}(or )?user .*not found/i.test(error.message)) {
       throw new Error(
         `Postgres rejected the connection to ${host}: "${error.message}". ` +
