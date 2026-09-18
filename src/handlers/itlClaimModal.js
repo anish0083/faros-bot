@@ -1,5 +1,6 @@
 const { MessageFlags } = require('discord.js');
 const { ethers } = require('ethers');
+const { EXPLORER_API, CHAIN } = require('../config/chain');
 const {
   getItlGuildSettings,
   hasUserItlClaimed,
@@ -9,6 +10,26 @@ const {
 } = require('../utils/itlDatabase');
 
 const DISPLAY_AMOUNTS = ['0.001', '0.002', '0.003'];
+
+async function checkNftBalance(walletAddress, contractAddress, tokenId) {
+  const params = new URLSearchParams({
+    module: 'account',
+    action: 'tokenbalance',
+    contractaddress: contractAddress,
+    address: walletAddress,
+  });
+  if (tokenId) params.set('tokenid', tokenId);
+
+  const res = await fetch(`${EXPLORER_API.baseUrl}/api?${params}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(EXPLORER_API.timeoutMs),
+  });
+
+  if (!res.ok) throw new Error(`Explorer HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.status !== '1' || data.result === null) return 0n;
+  return BigInt(data.result);
+}
 
 module.exports = async function handleItlClaimModal(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -54,13 +75,35 @@ module.exports = async function handleItlClaimModal(interaction) {
   if (strikeInfo?.timeout_until && new Date(strikeInfo.timeout_until) > new Date()) {
     const ts = Math.floor(new Date(strikeInfo.timeout_until).getTime() / 1000);
     await interaction.editReply({
-      content:
-        `🚫 **You are timed out.**\n\n` +
-        `You can try again <t:${ts}:R>.`,
+      content: `🚫 **You are timed out.**\n\nYou can try again <t:${ts}:R>.`,
     });
     return;
   }
 
+  // Step 1 — Check NFT ownership first
+  if (settings.contract_address) {
+    let balance;
+    try {
+      balance = await checkNftBalance(walletAddress, settings.contract_address, settings.token_id);
+    } catch (err) {
+      console.error('[ITL Claim] NFT check error:', err.message);
+      await interaction.editReply({
+        content: `❌ Could not verify NFT ownership on ${CHAIN.name} right now. Please try again in a moment.`,
+      });
+      return;
+    }
+
+    if (balance === 0n) {
+      await interaction.editReply({
+        content:
+          `❌ Wallet \`${walletAddress}\` does not hold **${settings.collection_name || 'the required NFT'}** on ${CHAIN.name}.\n\n` +
+          'Make sure you entered the correct wallet address.',
+      });
+      return;
+    }
+  }
+
+  // Step 2 — NFT confirmed, check for existing pending claim
   const existing = await getPendingClaimByUser(guildId, member.id);
   if (existing) {
     const minutesLeft = Math.max(1, Math.ceil((new Date(existing.expires_at) - Date.now()) / 60000));
@@ -69,8 +112,7 @@ module.exports = async function handleItlClaimModal(interaction) {
         `⏳ **You already have a pending verification.**\n\n` +
         `Send any amount from your wallet:\n\`${existing.wallet_address}\`\n\n` +
         `To this address:\n\`\`\`${existing.payment_wallet}\`\`\`\n` +
-        `⏰ Expires in **${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}**.\n\n` +
-        `The bot will automatically grant your role once the transaction is detected.`,
+        `⏰ Expires in **${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}**.`,
     });
     return;
   }
@@ -88,9 +130,12 @@ module.exports = async function handleItlClaimModal(interaction) {
     expiresAt,
   );
 
+  const collectionLabel = settings.collection_name || 'the required NFT';
+
   await interaction.editReply({
     content:
-      `✅ **Wallet registered!** Complete a transaction to verify ownership.\n\n` +
+      `✅ **Cool! This wallet holds ${collectionLabel}.**\n\n` +
+      `Now complete a small transaction to verify wallet ownership.\n\n` +
       `**From your wallet:**\n\`${walletAddress}\`\n\n` +
       `**To this address:**\n\`\`\`${settings.payment_wallet}\`\`\`\n` +
       `**Suggested amount:** \`${displayAmount} ITL\` (any amount works)\n\n` +
@@ -98,5 +143,5 @@ module.exports = async function handleItlClaimModal(interaction) {
       `Your role will be granted automatically once detected.`,
   });
 
-  console.log(`[ITL Claim] Pending | Guild: ${guildId} | User: ${member.id} | Wallet: ${walletAddress} | Expires: ${expiresAt.toISOString()}`);
+  console.log(`[ITL Claim] NFT verified + pending | Guild: ${guildId} | User: ${member.id} | Wallet: ${walletAddress}`);
 };

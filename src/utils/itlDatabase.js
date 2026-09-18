@@ -27,10 +27,14 @@ async function initializeItlDatabase() {
       role_id          TEXT NOT NULL,
       payment_wallet   TEXT NOT NULL,
       collection_name  TEXT NOT NULL DEFAULT '',
+      contract_address TEXT NOT NULL DEFAULT '',
+      token_id         TEXT,
       configured_at    TIMESTAMP NOT NULL DEFAULT NOW()
     );
 
-    ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS collection_name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS collection_name  TEXT NOT NULL DEFAULT '';
+    ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS contract_address TEXT NOT NULL DEFAULT '';
+    ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS token_id         TEXT;
 
     CREATE TABLE IF NOT EXISTS itl_pending_claims (
       id              SERIAL PRIMARY KEY,
@@ -70,16 +74,18 @@ async function getItlGuildSettings(guildId) {
   return rows[0] || null;
 }
 
-async function setItlGuildSettings(guildId, roleId, paymentWallet, collectionName) {
+async function setItlGuildSettings(guildId, roleId, paymentWallet, collectionName, contractAddress, tokenId) {
   await pool.query(`
-    INSERT INTO itl_guild_settings (guild_id, role_id, payment_wallet, collection_name)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO itl_guild_settings (guild_id, role_id, payment_wallet, collection_name, contract_address, token_id)
+    VALUES ($1, $2, $3, $4, $5, $6)
     ON CONFLICT (guild_id) DO UPDATE SET
-      role_id         = EXCLUDED.role_id,
-      payment_wallet  = EXCLUDED.payment_wallet,
-      collection_name = EXCLUDED.collection_name,
-      configured_at   = NOW()
-  `, [guildId, roleId, paymentWallet, collectionName || '']);
+      role_id          = EXCLUDED.role_id,
+      payment_wallet   = EXCLUDED.payment_wallet,
+      collection_name  = EXCLUDED.collection_name,
+      contract_address = EXCLUDED.contract_address,
+      token_id         = EXCLUDED.token_id,
+      configured_at    = NOW()
+  `, [guildId, roleId, paymentWallet, collectionName || '', contractAddress || '', tokenId || null]);
 }
 
 async function getActivePendingClaims() {
