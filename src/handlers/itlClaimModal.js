@@ -1,6 +1,8 @@
 const { MessageFlags } = require('discord.js');
 const { ethers } = require('ethers');
 const { EXPLORER_API, CHAIN } = require('../config/chain');
+
+const NFT_CHECK_TIMEOUT_MS = 12000;
 const {
   getItlGuildSettings,
   hasUserItlClaimed,
@@ -11,7 +13,7 @@ const {
 
 const DISPLAY_AMOUNTS = ['0.001', '0.002', '0.003'];
 
-async function checkNftBalance(walletAddress, contractAddress, tokenId) {
+async function checkNftBalance(explorerBaseUrl, walletAddress, contractAddress, tokenId) {
   const params = new URLSearchParams({
     module: 'account',
     action: 'tokenbalance',
@@ -20,9 +22,9 @@ async function checkNftBalance(walletAddress, contractAddress, tokenId) {
   });
   if (tokenId) params.set('tokenid', tokenId);
 
-  const res = await fetch(`${EXPLORER_API.baseUrl}/api?${params}`, {
+  const res = await fetch(`${explorerBaseUrl}/api?${params}`, {
     headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(EXPLORER_API.timeoutMs),
+    signal: AbortSignal.timeout(NFT_CHECK_TIMEOUT_MS),
   });
 
   if (!res.ok) throw new Error(`Explorer HTTP ${res.status}`);
@@ -80,11 +82,12 @@ module.exports = async function handleItlClaimModal(interaction) {
     return;
   }
 
-  // Step 1 — Check NFT ownership first
+  // Step 1 — Check NFT ownership on mainnet explorer
   if (settings.contract_address) {
+    const explorerBase = (settings.nft_explorer_url || EXPLORER_API.baseUrl).replace(/\/+$/, '');
     let balance;
     try {
-      balance = await checkNftBalance(walletAddress, settings.contract_address, settings.token_id);
+      balance = await checkNftBalance(explorerBase, walletAddress, settings.contract_address, settings.token_id);
     } catch (err) {
       console.error('[ITL Claim] NFT check error:', err.message);
       await interaction.editReply({

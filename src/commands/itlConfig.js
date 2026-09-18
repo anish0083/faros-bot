@@ -37,6 +37,12 @@ module.exports = {
     )
     .addStringOption(opt =>
       opt
+        .setName('nft_explorer')
+        .setDescription('Explorer base URL of the mainnet where the NFT lives (e.g. https://explorer.mainnet.xyz).')
+        .setRequired(true)
+    )
+    .addStringOption(opt =>
+      opt
         .setName('token_id')
         .setDescription('Token ID — only for ERC-1155 contracts.')
         .setRequired(false)
@@ -49,6 +55,7 @@ module.exports = {
     const contractInput   = interaction.options.getString('contract').trim();
     const role            = interaction.options.getRole('role');
     const walletInput     = interaction.options.getString('payment_wallet').trim();
+    const nftExplorerRaw  = interaction.options.getString('nft_explorer').trim().replace(/\/+$/, '');
     const tokenId         = interaction.options.getString('token_id')?.trim() || null;
 
     if (!/^0x[0-9a-fA-F]{40}$/.test(contractInput)) {
@@ -59,20 +66,25 @@ module.exports = {
       await interaction.editReply({ content: '❌ Invalid payment wallet address format.' });
       return;
     }
+    if (!/^https?:\/\/.+/.test(nftExplorerRaw)) {
+      await interaction.editReply({ content: '❌ `nft_explorer` must be a valid http(s) URL.' });
+      return;
+    }
 
     let contractAddress, paymentWallet;
     try { contractAddress = ethers.getAddress(contractInput); } catch { contractAddress = contractInput.toLowerCase(); }
     try { paymentWallet   = ethers.getAddress(walletInput);   } catch { paymentWallet   = walletInput.toLowerCase(); }
 
-    await setItlGuildSettings(interaction.guildId, role.id, paymentWallet, collectionName, contractAddress, tokenId);
+    await setItlGuildSettings(interaction.guildId, role.id, paymentWallet, collectionName, contractAddress, tokenId, nftExplorerRaw);
 
     await interaction.editReply({
       content:
         `✅ **ITL verification configured!**\n\n` +
         `**Collection:** ${collectionName}\n` +
-        `**Contract:** \`${contractAddress}\`\n` +
+        `**Contract (mainnet):** \`${contractAddress}\`\n` +
+        `**NFT Explorer:** \`${nftExplorerRaw}\`\n` +
         `**Role:** <@&${role.id}>\n` +
-        `**Payment wallet:** \`${paymentWallet}\`\n` +
+        `**Payment wallet (testnet):** \`${paymentWallet}\`\n` +
         (tokenId ? `**Token ID:** \`${tokenId}\`\n` : '') +
         `\nRun \`/itl-setup\` to post the verification embed.`,
     });
