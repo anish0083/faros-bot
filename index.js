@@ -6,6 +6,8 @@ const http = require('http');
 const { initializeDatabase } = require('./src/utils/database');
 const { validateChainConfig, CHAIN, NFT } = require('./src/config/chain');
 const { verifyChainConnection } = require('./src/utils/blockchain');
+const { startItlPoller } = require('./src/utils/itlPoller');
+const { initializeItlDatabase } = require('./src/utils/itlDatabase');
 
 const server = http.createServer((req, res) => {
   res.writeHead(200);
@@ -43,6 +45,7 @@ for (const file of fs.readdirSync(eventsPath).filter(f => f.endsWith('.js'))) {
 
 client.once('clientReady', () => {
   console.log(`Logged in as ${client.user.tag}`);
+  startItlPoller(client);
 });
 
 client.on('error', (error) => {
@@ -54,6 +57,7 @@ client.on('error', (error) => {
   console.log(`[Config] Chain: ${CHAIN.name} | Collection: ${NFT.name} | Contract: ${NFT.address}`);
 
   await initializeDatabase();
+  await initializeItlDatabase();
   await verifyChainConnection();
   await client.login(process.env.DISCORD_TOKEN);
 })().catch(err => {

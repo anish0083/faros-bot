@@ -1,0 +1,102 @@
+const { MessageFlags } = require('discord.js');
+const { ethers } = require('ethers');
+const {
+  getItlGuildSettings,
+  hasUserItlClaimed,
+  getPendingClaimByUser,
+  createPendingClaim,
+  getStrikeInfo,
+} = require('../utils/itlDatabase');
+
+const DISPLAY_AMOUNTS = ['0.001', '0.002', '0.003'];
+
+module.exports = async function handleItlClaimModal(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const guildId = interaction.guildId;
+  const member  = interaction.member;
+  const input   = interaction.fields.getTextInputValue('itl_wallet_input').trim();
+
+  const settings = await getItlGuildSettings(guildId);
+  if (!settings) {
+    await interaction.editReply({ content: '❌ This server has not been configured yet. Ask an admin to run `/itl-config`.' });
+    return;
+  }
+
+  if (!/^0x[0-9a-fA-F]{40}$/.test(input)) {
+    await interaction.editReply({
+      content:
+        '❌ **Invalid address format.**\n' +
+        'Must start with `0x` followed by exactly 40 hex characters.\n' +
+        'Example: `0x1234567890abcdef1234567890abcdef12345678`',
+    });
+    return;
+  }
+
+  let walletAddress;
+  try {
+    walletAddress = ethers.getAddress(input);
+  } catch {
+    walletAddress = input.toLowerCase();
+  }
+
+  if (await hasUserItlClaimed(guildId, member.id)) {
+    await interaction.editReply({ content: '❌ You have already completed wallet verification in this server.' });
+    return;
+  }
+
+  if (member.roles.cache.has(settings.role_id)) {
+    await interaction.editReply({ content: '✅ You already have this role!' });
+    return;
+  }
+
+  const strikeInfo = await getStrikeInfo(guildId, member.id);
+  if (strikeInfo?.timeout_until && new Date(strikeInfo.timeout_until) > new Date()) {
+    const ts = Math.floor(new Date(strikeInfo.timeout_until).getTime() / 1000);
+    await interaction.editReply({
+      content:
+        `🚫 **You are timed out.**\n\n` +
+        `You can try again <t:${ts}:R>.`,
+    });
+    return;
+  }
+
+  const existing = await getPendingClaimByUser(guildId, member.id);
+  if (existing) {
+    const minutesLeft = Math.max(1, Math.ceil((new Date(existing.expires_at) - Date.now()) / 60000));
+    await interaction.editReply({
+      content:
+        `⏳ **You already have a pending verification.**\n\n` +
+        `Send any amount from your wallet:\n\`${existing.wallet_address}\`\n\n` +
+        `To this address:\n\`\`\`${existing.payment_wallet}\`\`\`\n` +
+        `⏰ Expires in **${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}**.\n\n` +
+        `The bot will automatically grant your role once the transaction is detected.`,
+    });
+    return;
+  }
+
+  const displayAmount = DISPLAY_AMOUNTS[Math.floor(Math.random() * DISPLAY_AMOUNTS.length)];
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  await createPendingClaim(
+    guildId,
+    member.id,
+    walletAddress,
+    displayAmount,
+    settings.payment_wallet,
+    settings.role_id,
+    expiresAt,
+  );
+
+  await interaction.editReply({
+    content:
+      `✅ **Wallet registered!** Complete a transaction to verify ownership.\n\n` +
+      `**From your wallet:**\n\`${walletAddress}\`\n\n` +
+      `**To this address:**\n\`\`\`${settings.payment_wallet}\`\`\`\n` +
+      `**Suggested amount:** \`${displayAmount} ITL\` (any amount works)\n\n` +
+      `⏰ You have **15 minutes** to send the transaction.\n` +
+      `Your role will be granted automatically once detected.`,
+  });
+
+  console.log(`[ITL Claim] Pending | Guild: ${guildId} | User: ${member.id} | Wallet: ${walletAddress} | Expires: ${expiresAt.toISOString()}`);
+};
