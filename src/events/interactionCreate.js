@@ -3,10 +3,8 @@ const handleClaimButton    = require('../handlers/claimButton');
 const handleClaimModal     = require('../handlers/claimModal');
 const handleRoleSelect     = require('../handlers/roleSelect');
 const { ROLE_SELECT_ID }   = require('../utils/roleSetup');
-const handleItlClaimButton    = require('../handlers/itlClaimButton');
-const handleItlClaimModal     = require('../handlers/itlClaimModal');
-const handleItlNftClaimButton = require('../handlers/itlNftClaimButton');
-const handleItlNftClaimModal  = require('../handlers/itlNftClaimModal');
+const handleItlClaimButton = require('../handlers/itlClaimButton');
+const handleItlClaimModal  = require('../handlers/itlClaimModal');
 
 module.exports = {
   name: 'interactionCreate',
@@ -30,16 +28,14 @@ module.exports = {
       }
 
       if (interaction.isButton()) {
-        if (interaction.customId === 'claim_role_button')    await handleClaimButton(interaction);
-        if (interaction.customId === 'itl_claim_button')     await handleItlClaimButton(interaction);
-        if (interaction.customId === 'itl_nft_claim_button') await handleItlNftClaimButton(interaction);
+        if (interaction.customId === 'claim_role_button') await handleClaimButton(interaction);
+        if (interaction.customId === 'itl_claim_button')  await handleItlClaimButton(interaction);
         return;
       }
 
       if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'claim_role_modal')    await handleClaimModal(interaction);
-        if (interaction.customId === 'itl_claim_modal')     await handleItlClaimModal(interaction);
-        if (interaction.customId === 'itl_nft_claim_modal') await handleItlNftClaimModal(interaction);
+        if (interaction.customId === 'claim_role_modal') await handleClaimModal(interaction);
+        if (interaction.customId === 'itl_claim_modal')  await handleItlClaimModal(interaction);
         return;
       }
     } catch (error) {

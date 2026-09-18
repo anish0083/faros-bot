@@ -23,11 +23,14 @@ async function initializeItlDatabase() {
   await createPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS itl_guild_settings (
-      guild_id       TEXT PRIMARY KEY,
-      role_id        TEXT NOT NULL,
-      payment_wallet TEXT NOT NULL,
-      configured_at  TIMESTAMP NOT NULL DEFAULT NOW()
+      guild_id         TEXT PRIMARY KEY,
+      role_id          TEXT NOT NULL,
+      payment_wallet   TEXT NOT NULL,
+      collection_name  TEXT NOT NULL DEFAULT '',
+      configured_at    TIMESTAMP NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS collection_name TEXT NOT NULL DEFAULT '';
 
     CREATE TABLE IF NOT EXISTS itl_pending_claims (
       id              SERIAL PRIMARY KEY,
@@ -58,25 +61,6 @@ async function initializeItlDatabase() {
       PRIMARY KEY (guild_id, discord_user_id)
     );
 
-    CREATE TABLE IF NOT EXISTS itl_nft_configs (
-      id               SERIAL PRIMARY KEY,
-      guild_id         TEXT NOT NULL,
-      contract_address TEXT NOT NULL,
-      role_id          TEXT NOT NULL,
-      collection_name  TEXT NOT NULL,
-      token_id         TEXT,
-      configured_at    TIMESTAMP NOT NULL DEFAULT NOW(),
-      UNIQUE (guild_id, contract_address)
-    );
-
-    CREATE TABLE IF NOT EXISTS itl_nft_claims (
-      guild_id         TEXT NOT NULL,
-      discord_user_id  TEXT NOT NULL,
-      contract_address TEXT NOT NULL,
-      wallet_address   TEXT NOT NULL,
-      claimed_at       TIMESTAMP NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (guild_id, discord_user_id, contract_address)
-    );
   `);
   console.log('[ITL Database] Tables initialized');
 }
@@ -86,15 +70,16 @@ async function getItlGuildSettings(guildId) {
   return rows[0] || null;
 }
 
-async function setItlGuildSettings(guildId, roleId, paymentWallet) {
+async function setItlGuildSettings(guildId, roleId, paymentWallet, collectionName) {
   await pool.query(`
-    INSERT INTO itl_guild_settings (guild_id, role_id, payment_wallet)
-    VALUES ($1, $2, $3)
+    INSERT INTO itl_guild_settings (guild_id, role_id, payment_wallet, collection_name)
+    VALUES ($1, $2, $3, $4)
     ON CONFLICT (guild_id) DO UPDATE SET
-      role_id        = EXCLUDED.role_id,
-      payment_wallet = EXCLUDED.payment_wallet,
-      configured_at  = NOW()
-  `, [guildId, roleId, paymentWallet]);
+      role_id         = EXCLUDED.role_id,
+      payment_wallet  = EXCLUDED.payment_wallet,
+      collection_name = EXCLUDED.collection_name,
+      configured_at   = NOW()
+  `, [guildId, roleId, paymentWallet, collectionName || '']);
 }
 
 async function getActivePendingClaims() {
@@ -181,42 +166,6 @@ async function setUserTimeout(guildId, discordUserId, until) {
   `, [guildId, discordUserId, until]);
 }
 
-async function addItlNftConfig(guildId, contractAddress, roleId, collectionName, tokenId) {
-  await pool.query(`
-    INSERT INTO itl_nft_configs (guild_id, contract_address, role_id, collection_name, token_id)
-    VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (guild_id, contract_address) DO UPDATE SET
-      role_id         = EXCLUDED.role_id,
-      collection_name = EXCLUDED.collection_name,
-      token_id        = EXCLUDED.token_id,
-      configured_at   = NOW()
-  `, [guildId, contractAddress, roleId, collectionName, tokenId]);
-}
-
-async function getItlNftConfigs(guildId) {
-  const { rows } = await pool.query(
-    'SELECT * FROM itl_nft_configs WHERE guild_id = $1 ORDER BY configured_at',
-    [guildId]
-  );
-  return rows;
-}
-
-async function hasNftClaim(guildId, discordUserId, contractAddress) {
-  const { rows } = await pool.query(
-    'SELECT 1 FROM itl_nft_claims WHERE guild_id = $1 AND discord_user_id = $2 AND contract_address = $3',
-    [guildId, discordUserId, contractAddress]
-  );
-  return rows.length > 0;
-}
-
-async function recordNftClaim(guildId, discordUserId, contractAddress, walletAddress) {
-  await pool.query(`
-    INSERT INTO itl_nft_claims (guild_id, discord_user_id, contract_address, wallet_address)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (guild_id, discord_user_id, contract_address) DO NOTHING
-  `, [guildId, discordUserId, contractAddress, walletAddress]);
-}
-
 module.exports = {
   initializeItlDatabase,
   getItlGuildSettings, setItlGuildSettings,
@@ -224,5 +173,4 @@ module.exports = {
   deletePendingClaim, popExpiredPendingClaims,
   hasUserItlClaimed, recordItlClaim,
   getStrikeInfo, incrementStrike, setUserTimeout,
-  addItlNftConfig, getItlNftConfigs, hasNftClaim, recordNftClaim,
 };

@@ -25,9 +25,14 @@ module.exports = {
       return;
     }
 
+    const collectionLine = settings.collection_name
+      ? `**Collection:** ${settings.collection_name}\n`
+      : '';
+
     const embed = new EmbedBuilder()
       .setTitle('🔗 Wallet Verification')
       .setDescription(
+        `${collectionLine}` +
         `Verify your **${CHAIN.name}** wallet to receive the <@&${settings.role_id}> role.\n\n` +
         '**How it works:**\n' +
         '1. Click **Verify Wallet** below\n' +
