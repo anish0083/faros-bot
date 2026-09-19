@@ -30,6 +30,7 @@ async function initializeItlDatabase() {
       contract_address TEXT NOT NULL DEFAULT '',
       token_id         TEXT,
       nft_explorer_url TEXT,
+      nft_rpc_url      TEXT,
       configured_at    TIMESTAMP NOT NULL DEFAULT NOW()
     );
 
@@ -37,6 +38,7 @@ async function initializeItlDatabase() {
     ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS contract_address TEXT NOT NULL DEFAULT '';
     ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS token_id         TEXT;
     ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS nft_explorer_url TEXT;
+    ALTER TABLE itl_guild_settings ADD COLUMN IF NOT EXISTS nft_rpc_url      TEXT;
 
     CREATE TABLE IF NOT EXISTS itl_pending_claims (
       id              SERIAL PRIMARY KEY,
@@ -76,10 +78,10 @@ async function getItlGuildSettings(guildId) {
   return rows[0] || null;
 }
 
-async function setItlGuildSettings(guildId, roleId, paymentWallet, collectionName, contractAddress, tokenId, nftExplorerUrl) {
+async function setItlGuildSettings(guildId, roleId, paymentWallet, collectionName, contractAddress, tokenId, nftExplorerUrl, nftRpcUrl) {
   await pool.query(`
-    INSERT INTO itl_guild_settings (guild_id, role_id, payment_wallet, collection_name, contract_address, token_id, nft_explorer_url)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO itl_guild_settings (guild_id, role_id, payment_wallet, collection_name, contract_address, token_id, nft_explorer_url, nft_rpc_url)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT (guild_id) DO UPDATE SET
       role_id          = EXCLUDED.role_id,
       payment_wallet   = EXCLUDED.payment_wallet,
@@ -87,8 +89,9 @@ async function setItlGuildSettings(guildId, roleId, paymentWallet, collectionNam
       contract_address = EXCLUDED.contract_address,
       token_id         = EXCLUDED.token_id,
       nft_explorer_url = EXCLUDED.nft_explorer_url,
+      nft_rpc_url      = EXCLUDED.nft_rpc_url,
       configured_at    = NOW()
-  `, [guildId, roleId, paymentWallet, collectionName || '', contractAddress || '', tokenId || null, nftExplorerUrl || null]);
+  `, [guildId, roleId, paymentWallet, collectionName || '', contractAddress || '', tokenId || null, nftExplorerUrl || null, nftRpcUrl || null]);
 }
 
 async function getActivePendingClaims() {

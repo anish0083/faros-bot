@@ -13,7 +13,22 @@ const {
 
 const DISPLAY_AMOUNTS = ['0.001', '0.002', '0.003'];
 
-async function checkNftBalance(explorerBaseUrl, walletAddress, contractAddress, tokenId) {
+const ERC721_ABI  = ['function balanceOf(address owner) view returns (uint256)'];
+const ERC1155_ABI = ['function balanceOf(address account, uint256 id) view returns (uint256)'];
+
+async function checkNftBalanceViaRpc(rpcUrl, walletAddress, contractAddress, tokenId) {
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  if (tokenId) {
+    const contract = new ethers.Contract(contractAddress, ERC1155_ABI, provider);
+    const bal = await contract.balanceOf(walletAddress, BigInt(tokenId));
+    return BigInt(bal);
+  }
+  const contract = new ethers.Contract(contractAddress, ERC721_ABI, provider);
+  const bal = await contract.balanceOf(walletAddress);
+  return BigInt(bal);
+}
+
+async function checkNftBalanceViaExplorer(explorerBaseUrl, walletAddress, contractAddress, tokenId) {
   const params = new URLSearchParams({
     module: 'account',
     action: 'tokenbalance',
@@ -31,6 +46,15 @@ async function checkNftBalance(explorerBaseUrl, walletAddress, contractAddress, 
   const data = await res.json();
   if (data.status !== '1' || data.result === null) return 0n;
   return BigInt(data.result);
+}
+
+async function checkNftBalance(settings, walletAddress) {
+  const { contract_address, token_id, nft_rpc_url, nft_explorer_url } = settings;
+  if (nft_rpc_url) {
+    return checkNftBalanceViaRpc(nft_rpc_url, walletAddress, contract_address, token_id);
+  }
+  const explorerBase = (nft_explorer_url || EXPLORER_API.baseUrl).replace(/\/+$/, '');
+  return checkNftBalanceViaExplorer(explorerBase, walletAddress, contract_address, token_id);
 }
 
 module.exports = async function handleItlClaimModal(interaction) {
@@ -82,12 +106,11 @@ module.exports = async function handleItlClaimModal(interaction) {
     return;
   }
 
-  // Step 1 — Check NFT ownership on mainnet explorer
+  // Step 1 — Check NFT ownership on mainnet
   if (settings.contract_address) {
-    const explorerBase = (settings.nft_explorer_url || EXPLORER_API.baseUrl).replace(/\/+$/, '');
     let balance;
     try {
-      balance = await checkNftBalance(explorerBase, walletAddress, settings.contract_address, settings.token_id);
+      balance = await checkNftBalance(settings, walletAddress);
     } catch (err) {
       console.error('[ITL Claim] NFT check error:', err.message);
       await interaction.editReply({
