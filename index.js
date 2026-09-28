@@ -43,7 +43,7 @@ for (const file of fs.readdirSync(eventsPath).filter(f => f.endsWith('.js'))) {
   console.log(`Loaded event: ${event.name}`);
 }
 
-client.once('clientReady', () => {
+client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
   startItlPoller(client);
 });
