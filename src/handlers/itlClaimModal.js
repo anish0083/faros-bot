@@ -13,27 +13,33 @@ const {
 
 const DISPLAY_AMOUNTS = ['0.001', '0.002', '0.003'];
 
-const ERC721_ABI  = ['function balanceOf(address owner) view returns (uint256)'];
-const ERC1155_ABI = ['function balanceOf(address account, uint256 id) view returns (uint256)'];
-
 async function checkNftBalanceViaRpc(rpcUrl, walletAddress, contractAddress, tokenId) {
-  // staticNetwork prevents ethers from auto-detecting (avoids infinite retry on auth-gated RPCs)
-  const network = new ethers.Network('interlink-mainnet', 1312);
-  const provider = new ethers.JsonRpcProvider(rpcUrl, network, { staticNetwork: network });
-
-  const timeoutMs = NFT_CHECK_TIMEOUT_MS;
-  const timeout = new Promise((_, rej) =>
-    setTimeout(() => rej(new Error('RPC timeout')), timeoutMs)
-  );
-
+  const paddedAddr = walletAddress.replace('0x', '').toLowerCase().padStart(64, '0');
+  let data;
   if (tokenId) {
-    const contract = new ethers.Contract(contractAddress, ERC1155_ABI, provider);
-    const bal = await Promise.race([contract.balanceOf(walletAddress, BigInt(tokenId)), timeout]);
-    return BigInt(bal);
+    const paddedId = BigInt(tokenId).toString(16).padStart(64, '0');
+    data = `0x00fdd58e${paddedAddr}${paddedId}`; // ERC-1155 balanceOf(address,uint256)
+  } else {
+    data = `0x70a08231${paddedAddr}`; // ERC-721 balanceOf(address)
   }
-  const contract = new ethers.Contract(contractAddress, ERC721_ABI, provider);
-  const bal = await Promise.race([contract.balanceOf(walletAddress), timeout]);
-  return BigInt(bal);
+
+  const res = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'eth_call',
+      params: [{ to: contractAddress, data }, 'latest'],
+      id: 1,
+    }),
+    signal: AbortSignal.timeout(NFT_CHECK_TIMEOUT_MS),
+  });
+
+  if (!res.ok) throw new Error(`RPC HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message || 'RPC error');
+  if (!json.result || json.result === '0x') return 0n;
+  return BigInt(json.result);
 }
 
 async function checkNftBalanceViaExplorer(explorerBaseUrl, walletAddress, contractAddress, tokenId) {
