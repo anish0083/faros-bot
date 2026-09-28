@@ -59,6 +59,17 @@ client.on('error', (error) => {
   await initializeDatabase();
   await initializeItlDatabase();
   await verifyChainConnection();
+  console.log('[Discord] Testing token via REST...');
+  try {
+    const r = await fetch('https://discord.com/api/v10/users/@me', {
+      headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await r.json();
+    console.log(`[Discord] Token test: HTTP ${r.status} | user: ${body.username ?? body.message}`);
+  } catch (e) {
+    console.error('[Discord] Token test failed:', e.message);
+  }
   console.log('[Discord] Calling client.login()...');
   await client.login(process.env.DISCORD_TOKEN);
   console.log('[Discord] client.login() resolved');
