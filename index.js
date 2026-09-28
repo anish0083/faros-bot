@@ -59,7 +59,9 @@ client.on('error', (error) => {
   await initializeDatabase();
   await initializeItlDatabase();
   await verifyChainConnection();
+  console.log('[Discord] Calling client.login()...');
   await client.login(process.env.DISCORD_TOKEN);
+  console.log('[Discord] client.login() resolved');
 })().catch(err => {
   console.error('Startup error:', err.message);
   process.exit(1);
