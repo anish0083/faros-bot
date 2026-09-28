@@ -59,8 +59,18 @@ client.on('error', (error) => {
   await initializeDatabase();
   await initializeItlDatabase();
   await verifyChainConnection();
+  console.log('[Discord] Testing Discord API connectivity...');
+  try {
+    const ping = await fetch('https://discord.com/api/v10/gateway', { signal: AbortSignal.timeout(10000) });
+    console.log('[Discord] Discord API reachable, status:', ping.status);
+  } catch (e) {
+    console.error('[Discord] Cannot reach Discord API:', e.message);
+  }
   console.log('[Discord] Calling client.login()...');
-  await client.login(process.env.DISCORD_TOKEN);
+  await Promise.race([
+    client.login(process.env.DISCORD_TOKEN),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('Discord login timed out after 30s')), 30000)),
+  ]);
   console.log('[Discord] client.login() resolved');
 })().catch(err => {
   console.error('Startup error:', err.message);
