@@ -29,6 +29,11 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
+      await interaction.reply({ content: '❌ Only server administrators can use this command.', flags: MessageFlags.Ephemeral });
+      return;
+    }
+
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const roleId = interaction.options.getString('role_id');
