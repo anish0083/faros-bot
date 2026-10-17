@@ -3,7 +3,8 @@ const {
   getPtPending, deletePtPending, applyPoints, getLeaderboard,
 } = require('../utils/pointsDatabase');
 
-const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+const RANK_MEDALS  = ['🥇', '🥈', '🥉'];
+const RANK_COLORS  = [0xFFD700, 0xC0C0C0, 0xCD7F32];
 
 async function buildLeaderboardEmbed(guild, guildId) {
   const rows = await getLeaderboard(guildId, 10);
@@ -11,7 +12,7 @@ async function buildLeaderboardEmbed(guild, guildId) {
   if (!rows.length) {
     return new EmbedBuilder()
       .setTitle('📊 Points Leaderboard')
-      .setDescription('No points awarded yet.')
+      .setDescription('> No points awarded yet.\n> Use `/addpt` to get started!')
       .setColor(0x5865F2);
   }
 
@@ -23,14 +24,18 @@ async function buildLeaderboardEmbed(guild, guildId) {
     } catch {
       name = `Unknown (${row.discord_user_id.slice(-4)})`;
     }
-    const medal = RANK_MEDALS[i] ?? `${i + 1}.`;
-    return `${medal}  **${name}** — ${row.points} pts`;
+    const medal = RANK_MEDALS[i] ?? `\`${String(i + 1).padStart(2, ' ')}.\``;
+    const bar = '█'.repeat(Math.min(10, Math.ceil(row.points / 10))) || '░';
+    return `${medal} **${name}**\n┗ ${bar} **${row.points} pts**`;
   }));
 
+  const topColor = RANK_COLORS[0] ?? 0x5865F2;
+
   return new EmbedBuilder()
-    .setTitle('📊 Points Leaderboard')
-    .setDescription(lines.join('\n'))
-    .setColor(0x5865F2)
+    .setTitle('🏆 Points Leaderboard')
+    .setDescription(lines.join('\n\n'))
+    .setColor(topColor)
+    .setFooter({ text: 'Top 10 Contributors' })
     .setTimestamp();
 }
 

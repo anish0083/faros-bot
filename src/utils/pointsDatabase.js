@@ -127,11 +127,14 @@ async function getLeaderboard(guildId, limit = 10) {
 
 async function getModStats(guildId, limit = 10) {
   const { rows } = await pool.query(`
-    SELECT mod_discord_id, SUM(ABS(delta)) AS total_assigned
+    SELECT
+      mod_discord_id,
+      SUM(CASE WHEN delta > 0 THEN delta ELSE 0 END)  AS total_distributed,
+      SUM(CASE WHEN delta < 0 THEN ABS(delta) ELSE 0 END) AS total_removed
     FROM pt_transactions
     WHERE guild_id = $1
     GROUP BY mod_discord_id
-    ORDER BY total_assigned DESC
+    ORDER BY total_distributed DESC
     LIMIT $2
   `, [guildId, limit]);
   return rows;

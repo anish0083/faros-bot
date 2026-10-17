@@ -6,7 +6,7 @@ const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('mod-stats')
-    .setDescription('Show which mods have assigned the most points (ranked).'),
+    .setDescription('Show mod points activity ranked by distributed points.'),
 
   async execute(interaction) {
     await interaction.deferReply();
@@ -14,7 +14,7 @@ module.exports = {
     const rows = await getModStats(interaction.guildId, 10);
 
     if (!rows.length) {
-      await interaction.editReply({ content: 'No points have been assigned yet.' });
+      await interaction.editReply({ content: 'No points have been distributed yet.' });
       return;
     }
 
@@ -27,13 +27,16 @@ module.exports = {
         name = `Unknown (${row.mod_discord_id.slice(-4)})`;
       }
       const medal = RANK_MEDALS[i] ?? `${i + 1}.`;
-      return `${medal}  **${name}** — ${row.total_assigned} pts assigned`;
+      const distributed = Number(row.total_distributed);
+      const removed     = Number(row.total_removed);
+      return `${medal} **${name}**\n┣ 📤 Distributed: **${distributed} pts**\n┗ 📥 Removed: **${removed} pts**`;
     }));
 
     const embed = new EmbedBuilder()
-      .setTitle('🛡️ Mod Points Stats')
-      .setDescription(lines.join('\n'))
+      .setTitle('🛡️ Mod Activity Stats')
+      .setDescription(lines.join('\n\n'))
       .setColor(0xFFA500)
+      .setFooter({ text: 'Ranked by points distributed' })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
