@@ -62,12 +62,15 @@ module.exports = async function handlePtConfirm(interaction) {
 
   const leaderboardEmbed = await buildLeaderboardEmbed(interaction.guild, pending.guild_id);
 
+  // Ephemeral confirmation to the mod
   await interaction.editReply({
     content:
       `✅ **${isAdd ? 'Added' : 'Removed'} ${amount} pts** ${isAdd ? 'to' : 'from'} ${userLines}\n` +
       `📝 Reason: ${pending.reason}`,
-    embeds: [leaderboardEmbed],
   });
+
+  // Public leaderboard in channel
+  await interaction.channel.send({ embeds: [leaderboardEmbed] });
 };
 
 module.exports.buildLeaderboardEmbed = buildLeaderboardEmbed;

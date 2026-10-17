@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getModStats } = require('../utils/pointsDatabase');
 
 const RANK_MEDALS = ['🥇', '🥈', '🥉'];
@@ -9,7 +9,7 @@ module.exports = {
     .setDescription('Show which mods have assigned the most points (ranked).'),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferReply();
 
     const rows = await getModStats(interaction.guildId, 10);
 

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { buildLeaderboardEmbed } = require('../handlers/ptConfirm');
 
 module.exports = {
@@ -7,7 +7,7 @@ module.exports = {
     .setDescription('Show the top 10 points leaderboard.'),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferReply();
     const embed = await buildLeaderboardEmbed(interaction.guild, interaction.guildId);
     await interaction.editReply({ embeds: [embed] });
   },
