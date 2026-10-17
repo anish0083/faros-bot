@@ -139,18 +139,40 @@ async function getLeaderboard(guildId, limit = 10) {
   return rows;
 }
 
-async function getModStats(guildId, limit = 10) {
+async function getModStats(guildId, limit = 10, offset = 0) {
   const { rows } = await pool.query(`
     SELECT
       mod_discord_id,
-      SUM(CASE WHEN delta > 0 THEN delta ELSE 0 END)  AS total_distributed,
+      SUM(CASE WHEN delta > 0 THEN delta ELSE 0 END)      AS total_distributed,
       SUM(CASE WHEN delta < 0 THEN ABS(delta) ELSE 0 END) AS total_removed
     FROM pt_transactions
     WHERE guild_id = $1
     GROUP BY mod_discord_id
     ORDER BY total_distributed DESC
-    LIMIT $2
-  `, [guildId, limit]);
+    LIMIT $2 OFFSET $3
+  `, [guildId, limit, offset]);
+  return rows;
+}
+
+async function getModStatsCount(guildId) {
+  const { rows } = await pool.query(
+    'SELECT COUNT(DISTINCT mod_discord_id) AS cnt FROM pt_transactions WHERE guild_id = $1',
+    [guildId]
+  );
+  return Number(rows[0]?.cnt ?? 0);
+}
+
+async function getAllModStats(guildId) {
+  const { rows } = await pool.query(`
+    SELECT
+      mod_discord_id,
+      SUM(CASE WHEN delta > 0 THEN delta ELSE 0 END)      AS total_distributed,
+      SUM(CASE WHEN delta < 0 THEN ABS(delta) ELSE 0 END) AS total_removed
+    FROM pt_transactions
+    WHERE guild_id = $1
+    GROUP BY mod_discord_id
+    ORDER BY total_distributed DESC
+  `, [guildId]);
   return rows;
 }
 
@@ -166,6 +188,6 @@ module.exports = {
   setLogChannel, getLogChannelId,
   createPtPending, getPtPending, setPtPendingReason, deletePtPending,
   applyPoints, getUserPoints,
-  getLeaderboard, getModStats,
+  getLeaderboard, getModStats, getModStatsCount, getAllModStats,
   resetAllPoints,
 };

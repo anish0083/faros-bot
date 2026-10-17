@@ -7,6 +7,7 @@ const handleItlClaimButton = require('../handlers/itlClaimButton');
 const handleItlClaimModal  = require('../handlers/itlClaimModal');
 const handlePtReasonModal  = require('../handlers/ptReasonModal');
 const handlePtConfirm      = require('../handlers/ptConfirm');
+const handleModStatsNav    = require('../handlers/modStatsNav');
 
 module.exports = {
   name: 'interactionCreate',
@@ -36,6 +37,8 @@ module.exports = {
             interaction.customId.startsWith('pt_cancel:')  ||
             interaction.customId === 'pt_reset_confirm'     ||
             interaction.customId === 'pt_reset_cancel')      await handlePtConfirm(interaction);
+        if (interaction.customId.startsWith('ms_page:') ||
+            interaction.customId === 'ms_export')            await handleModStatsNav(interaction);
         return;
       }
 
