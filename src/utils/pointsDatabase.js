@@ -140,10 +140,17 @@ async function getModStats(guildId, limit = 10) {
   return rows;
 }
 
+async function resetAllPoints(guildId) {
+  await pool.query('DELETE FROM pt_points WHERE guild_id = $1', [guildId]);
+  await pool.query('DELETE FROM pt_transactions WHERE guild_id = $1', [guildId]);
+  await pool.query('DELETE FROM pt_pending WHERE guild_id = $1', [guildId]);
+}
+
 module.exports = {
   initializePointsDatabase,
   getPtConfig, setPtConfig,
   createPtPending, getPtPending, setPtPendingReason, deletePtPending,
   applyPoints, getUserPoints,
   getLeaderboard, getModStats,
+  resetAllPoints,
 };

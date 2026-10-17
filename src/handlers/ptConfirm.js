@@ -1,6 +1,6 @@
 const { EmbedBuilder, MessageFlags } = require('discord.js');
 const {
-  getPtPending, deletePtPending, applyPoints, getLeaderboard,
+  getPtPending, deletePtPending, applyPoints, getLeaderboard, resetAllPoints,
 } = require('../utils/pointsDatabase');
 
 const RANK_MEDALS  = ['🥇', '🥈', '🥉'];
@@ -40,6 +40,18 @@ async function buildLeaderboardEmbed(guild, guildId) {
 }
 
 module.exports = async function handlePtConfirm(interaction) {
+  // Handle reset buttons
+  if (interaction.customId === 'pt_reset_confirm') {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await resetAllPoints(interaction.guildId);
+    await interaction.editReply({ content: '✅ All points and history have been reset to zero. Fresh start!' });
+    return;
+  }
+  if (interaction.customId === 'pt_reset_cancel') {
+    await interaction.reply({ content: '❌ Reset cancelled.', flags: MessageFlags.Ephemeral });
+    return;
+  }
+
   const isConfirm = interaction.customId.startsWith('pt_confirm:');
   const uuid = interaction.customId.replace(/^pt_(confirm|cancel):/, '');
 

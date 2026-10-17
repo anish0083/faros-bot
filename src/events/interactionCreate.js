@@ -33,7 +33,9 @@ module.exports = {
         if (interaction.customId === 'claim_role_button') await handleClaimButton(interaction);
         if (interaction.customId === 'itl_claim_button')  await handleItlClaimButton(interaction);
         if (interaction.customId.startsWith('pt_confirm:') ||
-            interaction.customId.startsWith('pt_cancel:'))  await handlePtConfirm(interaction);
+            interaction.customId.startsWith('pt_cancel:')  ||
+            interaction.customId === 'pt_reset_confirm'     ||
+            interaction.customId === 'pt_reset_cancel')      await handlePtConfirm(interaction);
         return;
       }
 
