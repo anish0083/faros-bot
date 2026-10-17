@@ -5,6 +5,8 @@ const handleRoleSelect     = require('../handlers/roleSelect');
 const { ROLE_SELECT_ID }   = require('../utils/roleSetup');
 const handleItlClaimButton = require('../handlers/itlClaimButton');
 const handleItlClaimModal  = require('../handlers/itlClaimModal');
+const handlePtReasonModal  = require('../handlers/ptReasonModal');
+const handlePtConfirm      = require('../handlers/ptConfirm');
 
 module.exports = {
   name: 'interactionCreate',
@@ -30,12 +32,15 @@ module.exports = {
       if (interaction.isButton()) {
         if (interaction.customId === 'claim_role_button') await handleClaimButton(interaction);
         if (interaction.customId === 'itl_claim_button')  await handleItlClaimButton(interaction);
+        if (interaction.customId.startsWith('pt_confirm:') ||
+            interaction.customId.startsWith('pt_cancel:'))  await handlePtConfirm(interaction);
         return;
       }
 
       if (interaction.isModalSubmit()) {
         if (interaction.customId === 'claim_role_modal') await handleClaimModal(interaction);
         if (interaction.customId === 'itl_claim_modal')  await handleItlClaimModal(interaction);
+        if (interaction.customId.startsWith('pt_reason_modal:')) await handlePtReasonModal(interaction);
         return;
       }
     } catch (error) {

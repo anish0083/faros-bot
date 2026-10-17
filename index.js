@@ -8,6 +8,7 @@ const { validateChainConfig, CHAIN, NFT } = require('./src/config/chain');
 const { verifyChainConnection } = require('./src/utils/blockchain');
 const { startItlPoller } = require('./src/utils/itlPoller');
 const { initializeItlDatabase } = require('./src/utils/itlDatabase');
+const { initializePointsDatabase } = require('./src/utils/pointsDatabase');
 
 const server = http.createServer((req, res) => {
   res.writeHead(200);
@@ -58,6 +59,7 @@ client.on('error', (error) => {
 
   await initializeDatabase();
   await initializeItlDatabase();
+  await initializePointsDatabase();
   await verifyChainConnection();
   console.log('[Discord] Testing token via REST...');
   try {
