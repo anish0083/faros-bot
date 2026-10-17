@@ -1,6 +1,7 @@
 const { EmbedBuilder, MessageFlags } = require('discord.js');
 const {
-  getPtPending, deletePtPending, applyPoints, getLeaderboard, resetAllPoints,
+  getPtPending, deletePtPending, applyPoints, getLeaderboard,
+  resetAllPoints, getLogChannelId,
 } = require('../utils/pointsDatabase');
 
 const RANK_MEDALS  = ['🥇', '🥈', '🥉'];
@@ -77,16 +78,52 @@ module.exports = async function handlePtConfirm(interaction) {
   const amount = Math.abs(pending.delta);
   const userLines = userIds.map(id => `<@${id}>`).join(', ');
 
-  const leaderboardEmbed = await buildLeaderboardEmbed(interaction.guild, pending.guild_id);
-
   // Ephemeral confirmation to the mod
   await interaction.editReply({
-    content:
-      `✅ **${isAdd ? 'Added' : 'Removed'} ${amount} pts** ${isAdd ? 'to' : 'from'} ${userLines}\n` +
-      `📝 Reason: ${pending.reason}`,
+    content: `✅ Done! ${isAdd ? 'Added' : 'Removed'} **${amount} pts** ${isAdd ? 'to' : 'from'} ${userLines}`,
   });
 
-  // Public leaderboard in channel
+  // Public transparency message in the same channel
+  const modMention = `<@${pending.mod_id}>`;
+  const transparencyEmbed = new EmbedBuilder()
+    .setColor(isAdd ? 0x00C853 : 0xFF4500)
+    .setTitle(isAdd ? '📤 Points Distributed' : '📥 Points Removed')
+    .addFields(
+      { name: 'Mod', value: modMention, inline: true },
+      { name: isAdd ? 'Distributed' : 'Removed', value: `**${amount} pts** each`, inline: true },
+      { name: 'Users', value: userLines, inline: false },
+      { name: 'Reason', value: pending.reason, inline: false },
+    )
+    .setTimestamp();
+
+  await interaction.channel.send({ embeds: [transparencyEmbed] });
+
+  // Log to log channel if set
+  const logChannelId = await getLogChannelId(pending.guild_id);
+  if (logChannelId && logChannelId !== interaction.channel.id) {
+    try {
+      const logChannel = await interaction.guild.channels.fetch(logChannelId);
+      if (logChannel) {
+        const logEmbed = new EmbedBuilder()
+          .setColor(isAdd ? 0x00C853 : 0xFF4500)
+          .setTitle(`📋 Points Log — ${isAdd ? 'Add' : 'Remove'}`)
+          .addFields(
+            { name: 'Mod', value: `${modMention} (${pending.mod_id})`, inline: true },
+            { name: 'Action', value: isAdd ? `+${amount} pts` : `-${amount} pts`, inline: true },
+            { name: 'Users', value: userLines, inline: false },
+            { name: 'Reason', value: pending.reason, inline: false },
+            { name: 'Channel', value: `<#${interaction.channel.id}>`, inline: true },
+          )
+          .setTimestamp();
+        await logChannel.send({ embeds: [logEmbed] });
+      }
+    } catch {
+      // Log channel deleted or bot has no access — skip silently
+    }
+  }
+
+  // Public leaderboard
+  const leaderboardEmbed = await buildLeaderboardEmbed(interaction.guild, pending.guild_id);
   await interaction.channel.send({ embeds: [leaderboardEmbed] });
 };
 

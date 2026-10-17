@@ -15,10 +15,12 @@ async function initializePointsDatabase() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pt_config (
-      guild_id    TEXT PRIMARY KEY,
-      mod_role_id TEXT NOT NULL,
-      configured_at TIMESTAMP NOT NULL DEFAULT NOW()
+      guild_id       TEXT PRIMARY KEY,
+      mod_role_id    TEXT NOT NULL,
+      log_channel_id TEXT,
+      configured_at  TIMESTAMP NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE pt_config ADD COLUMN IF NOT EXISTS log_channel_id TEXT;
 
     CREATE TABLE IF NOT EXISTS pt_points (
       guild_id        TEXT NOT NULL,
@@ -64,6 +66,18 @@ async function setPtConfig(guildId, modRoleId) {
       mod_role_id   = EXCLUDED.mod_role_id,
       configured_at = NOW()
   `, [guildId, modRoleId]);
+}
+
+async function setLogChannel(guildId, channelId) {
+  await pool.query(
+    'UPDATE pt_config SET log_channel_id = $2 WHERE guild_id = $1',
+    [guildId, channelId]
+  );
+}
+
+async function getLogChannelId(guildId) {
+  const { rows } = await pool.query('SELECT log_channel_id FROM pt_config WHERE guild_id = $1', [guildId]);
+  return rows[0]?.log_channel_id ?? null;
 }
 
 async function createPtPending(guildId, modId, userIds, delta) {
@@ -149,6 +163,7 @@ async function resetAllPoints(guildId) {
 module.exports = {
   initializePointsDatabase,
   getPtConfig, setPtConfig,
+  setLogChannel, getLogChannelId,
   createPtPending, getPtPending, setPtPendingReason, deletePtPending,
   applyPoints, getUserPoints,
   getLeaderboard, getModStats,
