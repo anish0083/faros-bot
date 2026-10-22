@@ -128,14 +128,32 @@ async function getUserPoints(guildId, userId) {
   return rows[0]?.points ?? 0;
 }
 
-async function getLeaderboard(guildId, limit = 10) {
+async function getLeaderboard(guildId, limit = 10, offset = 0) {
   const { rows } = await pool.query(`
     SELECT discord_user_id, points
     FROM pt_points
     WHERE guild_id = $1 AND points > 0
     ORDER BY points DESC
-    LIMIT $2
-  `, [guildId, limit]);
+    LIMIT $2 OFFSET $3
+  `, [guildId, limit, offset]);
+  return rows;
+}
+
+async function getLeaderboardCount(guildId) {
+  const { rows } = await pool.query(
+    'SELECT COUNT(*) AS cnt FROM pt_points WHERE guild_id = $1 AND points > 0',
+    [guildId]
+  );
+  return Number(rows[0]?.cnt ?? 0);
+}
+
+async function getAllLeaderboard(guildId) {
+  const { rows } = await pool.query(`
+    SELECT discord_user_id, points
+    FROM pt_points
+    WHERE guild_id = $1 AND points > 0
+    ORDER BY points DESC
+  `, [guildId]);
   return rows;
 }
 
@@ -188,6 +206,7 @@ module.exports = {
   setLogChannel, getLogChannelId,
   createPtPending, getPtPending, setPtPendingReason, deletePtPending,
   applyPoints, getUserPoints,
-  getLeaderboard, getModStats, getModStatsCount, getAllModStats,
+  getLeaderboard, getLeaderboardCount, getAllLeaderboard,
+  getModStats, getModStatsCount, getAllModStats,
   resetAllPoints,
 };
