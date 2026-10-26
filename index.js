@@ -1,8 +1,12 @@
+const dns = require('node:dns');
+dns.setDefaultResultOrder('ipv4first');
+
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const crypto = require('node:crypto');
 const { initializeDatabase } = require('./src/utils/database');
 const { validateChainConfig, CHAIN, NFT } = require('./src/config/chain');
 const { verifyChainConnection } = require('./src/utils/blockchain');
@@ -21,15 +25,90 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
-const server = http.createServer((req, res) => {
-  const payload = JSON.stringify({
+function healthPayload() {
+  return JSON.stringify({
     ok: true,
     discord: Boolean(client.isReady()),
     db: Boolean(client.dbReady),
     user: client.user?.tag || null,
   });
+}
 
-  if (req.url === '/health') {
+function verifyDiscordSignature(rawBody, signatureHex, timestamp, publicKeyHex) {
+  try {
+    const key = crypto.createPublicKey({
+      key: Buffer.concat([
+        Buffer.from('302a300506032b6570032100', 'hex'),
+        Buffer.from(publicKeyHex, 'hex'),
+      ]),
+      format: 'der',
+      type: 'spki',
+    });
+    return crypto.verify(null, Buffer.from(`${timestamp}${rawBody}`), key, Buffer.from(signatureHex, 'hex'));
+  } catch (error) {
+    console.error('[Discord HTTP] Signature verify failed:', error.message);
+    return false;
+  }
+}
+
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+const server = http.createServer((req, res) => {
+  const url = (req.url || '/').split('?')[0];
+
+  if (req.method === 'POST') {
+    const signature = req.headers['x-signature-ed25519'];
+    const timestamp = req.headers['x-signature-timestamp'];
+    const publicKey = (process.env.DISCORD_PUBLIC_KEY || '').trim();
+
+    readRequestBody(req).then(raw => {
+      if (!signature || !timestamp) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      if (!publicKey) {
+        console.error('[Discord HTTP] Got an interaction POST but DISCORD_PUBLIC_KEY is not set. Clear Interactions Endpoint URL in the Discord Developer Portal, or set DISCORD_PUBLIC_KEY.');
+        res.writeHead(401);
+        res.end();
+        return;
+      }
+      if (!verifyDiscordSignature(raw.toString('utf8'), signature, timestamp, publicKey)) {
+        res.writeHead(401);
+        res.end();
+        return;
+      }
+
+      const body = JSON.parse(raw.toString('utf8'));
+      if (body.type === 1) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ type: 1 }));
+        return;
+      }
+
+      console.log(`[Discord HTTP] Interaction type=${body.type} command=${body.data?.name || body.data?.custom_id || 'n/a'}`);
+      if (client.actions?.InteractionCreate) {
+        client.actions.InteractionCreate.handle(body);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ type: 5, data: { flags: 64 } }));
+    }).catch(error => {
+      console.error('[Discord HTTP]', error.message);
+      res.writeHead(500);
+      res.end();
+    });
+    return;
+  }
+
+  const payload = healthPayload();
+  if (url === '/health') {
     res.writeHead(client.isReady() ? 200 : 503, { 'Content-Type': 'application/json' });
     res.end(payload);
     return;

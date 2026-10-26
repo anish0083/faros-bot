@@ -16,6 +16,21 @@ module.exports = {
 
   async execute(interaction, client) {
     try {
+      console.log(
+        `[Discord] Interaction received: ${interaction.type} ${interaction.commandName || interaction.customId || ''}`
+      );
+
+      const originalDefer = interaction.deferReply.bind(interaction);
+      interaction.deferReply = async function deferReplySafe(options) {
+        if (interaction.deferred || interaction.replied) return interaction;
+        return originalDefer(options);
+      };
+      const originalReply = interaction.reply.bind(interaction);
+      interaction.reply = async function replySafe(options) {
+        if (interaction.deferred && !interaction.replied) return interaction.editReply(options);
+        return originalReply(options);
+      };
+
       if (!client.dbReady) {
         if (interaction.isRepliable()) {
           await interaction.reply({
