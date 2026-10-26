@@ -16,6 +16,16 @@ module.exports = {
 
   async execute(interaction, client) {
     try {
+      if (!client.dbReady) {
+        if (interaction.isRepliable()) {
+          await interaction.reply({
+            content: '⏳ Bot is still starting up. Try the command again in a few seconds.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+        return;
+      }
+
       if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) {
